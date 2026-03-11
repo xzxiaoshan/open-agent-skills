@@ -1,0 +1,22 @@
+{
+  "name": "agent-skills",
+  "owner": {
+    "name": "单红宇",
+    "email": "365384722@qq.com"
+  },
+  "metadata": {
+    "description": "Agent 技能集合，包含中国法定节假日查询等实用工具",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "china-holidays-plugin",
+      "description": "中国国家法定节假日查询工具",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/china-holidays"
+      ]
+    }
+  ]
+}
