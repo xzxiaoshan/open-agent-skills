@@ -190,13 +190,37 @@ def extract_first_url_v2(search_result: dict) -> tuple:
         (URL, 标题) 元组
 
     Raises:
-        ValueError: 如果无法找到有效的 URL
+        ValueError: 如果无法找到有效的 URL 或搜索结果为空
     """
+    # 检查接口返回的 code 是否为 200（成功）
+    code = search_result.get('code')
+    if code != 200:
+        msg = search_result.get('msg', '')
+        raise ValueError(f"搜索接口返回错误：{msg}（code={code}）")
+
+    # 检查 searchVO 是否存在
+    search_vo = search_result.get('searchVO')
+    if search_vo is None:
+        raise ValueError("搜索结果为空，该年份的节假日通知可能尚未发布")
+
     try:
-        # 新接口结构：searchVO.catMap.gongwen.listVO
-        list_items = search_result['searchVO']['catMap']['gongwen']['listVO']
+        # 新接口结构：searchVO.catMap.gongwen.listVO 或 searchVO.catMap.gongbao.listVO
+        # 优先从 gongbao 中读取，如果没有再从 gongwen 中获取
+        cat_map = search_vo.get('catMap', {})
+        list_items = []
+        if cat_map:
+            # 优先尝试 gongbao
+            gongbao = cat_map.get('gongbao', {})
+            if gongbao:
+                list_items = gongbao.get('listVO', [])
+            # 如果 gongbao 中没有，再尝试 gongwen
+            if not list_items:
+                gongwen = cat_map.get('gongwen', {})
+                if gongwen:
+                    list_items = gongwen.get('listVO', [])
+
         if not list_items:
-            raise ValueError("搜索结果为空")
+            raise ValueError("搜索结果为空，该年份的节假日通知可能尚未发布")
 
         first_item = list_items[0]
         url = first_item.get('url', '')
@@ -485,6 +509,12 @@ def extract_chinese_text(html: str) -> str:
 
     result = ''.join(cleaned_result)
 
+    # 移除文章中的无关内容（直接匹配文字）
+    result = result.replace('扫一扫在手机打开当前页', '')
+    result = result.replace('解读', '')
+    result = result.replace('登录', '')
+    result = result.replace('注册', '')
+
     # 清理多余的空行和空格
     result = re.sub(r'\n\s*\n+', '\n\n', result)
     result = re.sub(r' +', ' ', result)
@@ -514,7 +544,10 @@ def fetch_and_cache(year: int) -> dict:
         print(f"找到通知：{url}", file=sys.stderr)
     except ValueError as e:
         print(f"错误：{e}", file=sys.stderr)
-        print(f"可能该年份的节假日通知尚未发布", file=sys.stderr)
+        # 如果错误信息中已经包含"没有"、"为空"或"尚未发布"，则不再重复提示
+        error_msg = str(e)
+        if "没有" not in error_msg and "为空" not in error_msg and "尚未发布" not in error_msg:
+            print(f"可能该年份的节假日通知尚未发布", file=sys.stderr)
         sys.exit(1)
 
     # 第三步：获取并清理通知内容
